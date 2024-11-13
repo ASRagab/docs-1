@@ -11,7 +11,7 @@ updated_at: 2024-11-16
 
 # Using Retrieval Augmented Generation to enhance your LLMs
 
-This guide shows how to use Retrieval Augmented Generation (RAG) to enhance a large language model (LLM). RAG is the process of enabling an LLM to reference context outside of its intial training data before generating its response. It can be extremely expensive in both time and computing power to train a model that is useful for your own domain-specific purposes. Therefore, using RAG is a cost-effective alternative to extending the capabilities of an existing LLM.
+This guide shows how to use Retrieval Augmented Generation (RAG) to enhance a large language model (LLM). RAG is the process of enabling an LLM to reference context outside of its initial training data before generating its response. It can be extremely expensive in both time and computing power to train a model that is useful for your own domain-specific purposes. Therefore, using RAG is a cost-effective alternative to extending the capabilities of an existing LLM.
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ We'll organize our project structure like so:
 
 ## Setting up our LLM
 
-Before we even start writing code for our LLM we'll want to download the model into our project. For this project we'll be using Llama 3.2 with a Q4_K_M quant.
+Before we even start writing code for our LLM we'll want to download the model into our project. For this project we'll be using Llama 3.2 with the Q4_K_M quantization.
 
 ```bash
 mkdir model
@@ -73,7 +73,7 @@ curl -OL https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/mai
 cd ..
 ```
 
-Now that we have our model we can load it into our code. We'll also define our [embed model](https://docs.llamaindex.ai/en/stable/module_guides/models/embeddings/) - for vectorising our documentation - using a recommend [embed model](https://huggingface.co/BAAI/bge-large-en-v1.5) from Hugging Face. At this point we can also create a prompt template for prompts with our query engine. It will just sanitise some of the hallucinations so that if the model does not know an answer it won't pretend like it does.
+Now that we have our model we can load it into our code. We'll also define our [embed model](https://docs.llamaindex.ai/en/stable/module_guides/models/embeddings/) using a recommend [model](https://huggingface.co/BAAI/bge-large-en-v1.5) from Hugging Face. At this point we can also create a prompt template for prompts with our query engine. It will just sanitize some of the hallucinations so that if the model does not know an answer it won't pretend like it does.
 
 ```python title:common/model_paramters.py
 from llama_index.core import ChatPromptTemplate
@@ -117,7 +117,7 @@ text_qa_template = ChatPromptTemplate.from_messages([
 
 ## Building a Query Engine
 
-The next step is where we embed our context into the LLM. For this example we can embed the Nitric documentation to allow searchability using the LLM. It's open-source on [GitHub](https://github.com/nitrictech/docs), so we can clone it into our project.
+The next step is where we embed our context into the LLM. For this example we will embed the Nitric documentation. It's open-source on [GitHub](https://github.com/nitrictech/docs), so we can clone it into our project.
 
 ```bash
 git clone https://github.com/nitrictech/docs.git nitric-docs
