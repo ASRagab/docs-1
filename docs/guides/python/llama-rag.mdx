@@ -42,7 +42,7 @@ Next, let's install our base dependencies, then add the `llama-index` libraries.
 # Install the base dependencies
 uv sync
 # Add Llama index dependencies
-uv add llama-index llama-index-embeddings-huggingface llama-index-llama-cpp
+uv add llama-index llama-index-embeddings-huggingface llama-index-llms-llama-cpp
 ```
 
 We'll organize our project structure like so:
@@ -78,7 +78,7 @@ cd ..
 
 Now that we have our model we can load it into our code. We'll also define our [embed model](https://docs.llamaindex.ai/en/stable/module_guides/models/embeddings/) using a recommend [model](https://huggingface.co/BAAI/bge-large-en-v1.5) from Hugging Face. At this point we can also create a prompt template for prompts with our query engine. It will just sanitize some of the hallucinations so that if the model does not know an answer it won't pretend like it does.
 
-```python title:common/model_paramters.py
+```python title:common/model_parameters.py
 from llama_index.core import ChatPromptTemplate
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.llama_cpp import LlamaCPP
@@ -166,7 +166,7 @@ uv run build_query_engine.py
 
 With our LLM ready for querying, we can create an API to handle prompts.
 
-```python
+```python title:services/api.py
 import os
 
 from common.model_parameters import embed_model, llm, text_qa_template, persist_dir
