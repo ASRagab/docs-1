@@ -1,7 +1,7 @@
 ---
 description: 'Making LLMs smarter with Dynamic Knowledge Access using Retrieval Augmented Generation'
 tags:
-  - API
+  - Realtime & Websockets
   - AI & Machine Learning
 languages:
   - python
@@ -54,7 +54,7 @@ We'll organize our project structure like so:
 +--model/
 |  +-- Llama-3.2-1B-Instruct-Q4_K_M.gguf
 +--services/
-|  +-- api.py
+|  +-- chat.py
 +--.gitignore
 +--.python-version
 +-- build_query_engine.py
@@ -162,32 +162,55 @@ You can then run this using the following command. This should output the embeds
 uv run build_query_engine.py
 ```
 
-## Creating an API for querying our model
+## Creating a Websocket for querying our model
 
-With our LLM ready for querying, we can create an API to handle prompts.
+With our LLM ready for querying, we can create a websocket to handle prompts.
 
-```python title:services/api.py
+```python title:services/chat.py
 import os
 
-from common.model_parameters import embed_model, llm, text_qa_template, persist_dir
+from common.model_parameters import embed_model, llm, persist_dir, text_qa_template
 
-from nitric.resources import api
-from nitric.context import HttpContext
+from nitric.resources import websocket
+from nitric.context import WebsocketContext
 from nitric.application import Nitric
 from llama_index.core import StorageContext, load_index_from_storage, Settings
+
 
 # Set global settings for llama index
 Settings.llm = llm
 Settings.embed_model = embed_model
 
-main_api = api("main")
+socket = websocket("socket")
 
-@main_api.post("/prompt")
-async def query_model(ctx: HttpContext):
-  # Pull the data from the request body
-  query = str(ctx.req.data)
+# Handle socket connections
+@socket.on("connect")
+async def on_connect(ctx):
+  print(f"socket connected with {ctx.req.connection_id}")
+  return ctx
 
-  print(f"Querying model: \"{query}\"")
+# Handle socket disconnections
+@socket.on("disconnect")
+async def on_disconnect(ctx):
+  # handle disconnections
+  print(f"socket disconnected with {ctx.req.connection_id}")
+  return ctx
+
+# Handle socket messages
+@socket.on("message")
+async def on_message(ctx: WebsocketContext):
+  # Query the model with the requested prompt
+  prompt = ctx.req.data.decode("utf-8")
+
+  response = await query_model(prompt)
+
+  # Send a response to the open connection
+  await socket.send(ctx.req.connection_id, response.encode("utf-8"))
+
+  return ctx
+
+async def query_model(prompt: str):
+  print(f"Querying model: \"{prompt}\"")
 
   # Get the model from the stored local context
   if os.path.exists(persist_dir):
@@ -196,36 +219,31 @@ async def query_model(ctx: HttpContext):
     index = load_index_from_storage(storage_context)
 
     # Get the query engine from the index, and use the prompt template for santisation.
-    query_engine = index.as_query_engine(streaming=False, similarity_top_k=4, text_qa_template=text_qa_template)
+    query_engine = index.as_query_engine(
+      streaming=False,
+      similarity_top_k=4,
+      text_qa_template=text_qa_template
+    )
   else:
     print("model does not exist")
-    ctx.res.success= False
-    return ctx
+    return "model does not exist"
 
   # Query the model
-  response = query_engine.query(query)
+  query_response = query_engine.query(prompt)
 
-  ctx.res.body = f"{response}"
+  print(f"Response: \n{query_response}")
 
-  print(f"Response: \n{response}")
-
-  return ctx
+  return query_response.response
 
 Nitric.run()
 ```
 
 ## Test it locally
 
-Now that you have an API defined, we can test it locally. You can do this using `nitric start` and make a request to the API either through the [Nitric Dashboard](/get-started/foundations/projects/local-development#local-dashboard) or another HTTP client like cURL.
-
-```bash
-curl -X POST http://localhost:4001/prompt -d "What is Nitric?"
-```
-
-This should produce an output similar to:
+Now that we have the Websocket defined, we can test it locally. You can do this using `nitric start` and connecting to the websocket through either the [Nitric Dashboard](/get-started/foundations/projects/local-development#local-dashboard) or another Websocket client. Once connected, you can send a message with a prompt to the model. Sending a prompt like "What is Nitric?" should produce an output similar to:
 
 ```text
-Nitric is a cloud-agnostic framework designed to aid developers in building full cloud applications, including infrastructure. It is a declarative cloud framework with common resources like APIs, websockets, databases, queues, topics, buckets, and more. The framework provides tools for locally simulating a cloud environment, to allow an application to be tested locally, and it makes it possible to interact with resources at runtime. It is a lightweight and flexible framework that allows developers to structure their projects according to their preferences and needs. Nitric is not a replacement for IaC tools like Terraform but rather introduces a method of bringing developer self-service for infrastructure directly into the developer application. Nitric can be augmented through use of tools like Pulumi or Terraform and even be fully customized using such tools. The framework supports multiple programming languages, and its default deployment engines are built with Pulumi. Nitric provides tools for defining services in your project's `nitric.yaml` file, and each service can be run independently, allowing your app to scale and manage different workloads efficiently. Services are the heart of Nitric apps, they're the entrypoints to your code. They can serve as APIs, websockets, schedule handlers, subscribers and a lot more.
+Nitric is a cloud-agnostic framework designed to aid developers in building full cloud applications, including infrastructure.
 ```
 
 ## Get ready for deployment
@@ -258,6 +276,8 @@ nitric stack new dev aws
 
 Update the stack file `nitric.dev.yaml` with the appropriate AWS region and memory allocation to handle the model:
 
+<Note>WebSockets are supported across all of AWS regions</Note>
+
 ```yaml title:nitric.dev.yaml
 provider: nitric/aws@1.14.0
 region: us-east-1
@@ -280,11 +300,7 @@ We can then deploy using the following command:
 nitric up
 ```
 
-Testing on AWS will be the same as we did locally, we'll just use cURL to make a request to the API URL that was outputted at the end of the deployment.
-
-```bash
-curl -x POST {your AWS endpoint URL here}/prompt -d "What is Nitric?"
-```
+Testing on AWS we'll need to use a Websocket client or the AWS portal. You can verify it in the same way as locally by connecting to the websocket and sending a message with a prompt for the model.
 
 Once you're finished querying the model, you can destroy the deployment using `nitric down`.
 
